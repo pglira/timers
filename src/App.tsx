@@ -9,6 +9,7 @@ import {
   isIdle,
   loadTimers,
   nextColor,
+  overtimeMs,
   remainingMs,
   reset,
   saveTimers,
@@ -48,37 +49,40 @@ export default function App() {
   // The id of the timer in the edit form, 'new' for a new timer, or null.
   const [editing, setEditing] = useState<string | null>(null);
   const [theme, nextTheme] = useTheme();
-  // The time at which each timer with an active alarm got to zero, by id.
-  const [alarms, setAlarms] = useState<Record<string, number>>({});
+  // The ids of the timers with an active alarm.
+  const [alarms, setAlarms] = useState<ReadonlySet<string>>(new Set());
 
   const anyRunning = timers.some((t) => t.endAt !== null);
+  const anyFinished = timers.some((t) => t.finished);
 
   useEffect(() => saveTimers(timers), [timers]);
 
+  // Finished timers count on past zero, so they also need a clock.
+  const ticking = anyRunning || anyFinished;
   useEffect(() => {
-    if (!anyRunning) return;
+    if (!ticking) return;
     const id = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(id);
-  }, [anyRunning]);
+  }, [ticking]);
 
   // Mark running timers as finished when they get to zero and start their
   // alarms.
   useEffect(() => {
     const done = timers.filter((t) => t.endAt !== null && t.endAt <= now);
     if (done.length === 0) return;
-    const ids = new Set(done.map((t) => t.id));
-    setTimers((ts) => ts.map((t) => (ids.has(t.id) ? finish(t) : t)));
-    const ends = Object.fromEntries(done.map((t) => [t.id, t.endAt as number]));
-    setAlarms((a) => ({ ...a, ...ends }));
+    setTimers((ts) =>
+      ts.map((t) => (t.endAt !== null && t.endAt <= now ? finish(t, t.endAt) : t)),
+    );
+    setAlarms((a) => new Set([...a, ...done.map((t) => t.id)]));
   }, [timers, now]);
 
   // An alarm stays active until the user stops it or changes its timer.
-  const ringing = timers.filter((t) => t.id in alarms);
+  const ringing = timers.filter((t) => alarms.has(t.id));
   // A timer that got to zero long ago, for example while the app was closed,
   // shows its alarm without sound.
-  const loud = ringing.some((t) => Date.now() - alarms[t.id] < ALARM_MS);
+  const loud = ringing.some((t) => overtimeMs(t, Date.now()) < ALARM_MS);
   useAlarm(loud);
-  const stopAlarms = () => setAlarms({});
+  const stopAlarms = () => setAlarms(new Set());
 
   // Update the display at once when the app comes back to the foreground.
   useEffect(() => {
@@ -89,8 +93,7 @@ export default function App() {
 
   useWakeLock(anyRunning);
 
-  const clearAlarm = (id: string) =>
-    setAlarms((a) => Object.fromEntries(Object.entries(a).filter(([k]) => k !== id)));
+  const clearAlarm = (id: string) => setAlarms((a) => new Set([...a].filter((x) => x !== id)));
 
   const update = (id: string, fn: (t: Timer) => Timer) => {
     clearAlarm(id);
@@ -138,9 +141,10 @@ export default function App() {
         {timers.map((timer) => {
           const running = timer.endAt !== null;
           const left = remainingMs(timer, now);
+          const over = overtimeMs(timer, now);
           const progress = timer.durationMs > 0 ? left / timer.durationMs : 0;
           const state = timer.finished ? 'finished' : running ? 'running' : 'stopped';
-          const alarm = timer.id in alarms ? ' alarm' : '';
+          const alarm = alarms.has(timer.id) ? ' alarm' : '';
           return (
             <SwipeRow
               key={timer.id}
@@ -151,7 +155,9 @@ export default function App() {
               <div className="bar" style={{ transform: `scaleX(${progress})` }} />
               <button className="info" onClick={() => setEditing(timer.id)}>
                 <span className="name">{timer.name}</span>
-                <span className="time">{formatDuration(left)}</span>
+                <span className="time">
+                  {over > 0 ? `-${formatDuration(over)}` : formatDuration(left)}
+                </span>
               </button>
               <div className="actions">
                 <button

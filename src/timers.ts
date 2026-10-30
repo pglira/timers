@@ -8,6 +8,8 @@ export interface Timer {
   // Clock time at which a running timer gets to zero; null when stopped.
   endAt: number | null;
   finished: boolean;
+  // Clock time at which a finished timer got to zero; null when not finished.
+  finishedAt: number | null;
 }
 
 const STORAGE_KEY = 'timers.v1';
@@ -37,7 +39,11 @@ export function loadTimers(): Timer[] {
     const parsed: unknown = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return [];
     // Timers stored without a color get the first color.
-    return (parsed as Timer[]).map((t) => ({ ...t, color: t.color ?? COLORS[0] }));
+    return (parsed as Timer[]).map((t) => ({
+      ...t,
+      color: t.color ?? COLORS[0],
+      finishedAt: t.finishedAt ?? null,
+    }));
   } catch {
     return [];
   }
@@ -60,6 +66,7 @@ export function createTimer(name: string, color: string, durationMs: number): Ti
     remainingMs: durationMs,
     endAt: null,
     finished: false,
+    finishedAt: null,
   };
 }
 
@@ -67,11 +74,22 @@ export function remainingMs(timer: Timer, now: number): number {
   return timer.endAt === null ? timer.remainingMs : Math.max(0, timer.endAt - now);
 }
 
+// The time since a finished timer got to zero.
+export function overtimeMs(timer: Timer, now: number): number {
+  return timer.finishedAt === null ? 0 : Math.max(0, now - timer.finishedAt);
+}
+
 export function start(timer: Timer, now: number): Timer {
   if (timer.endAt !== null) return timer;
   // A finished timer starts again from its full duration.
   const remaining = timer.finished || timer.remainingMs <= 0 ? timer.durationMs : timer.remainingMs;
-  return { ...timer, endAt: now + remaining, remainingMs: remaining, finished: false };
+  return {
+    ...timer,
+    endAt: now + remaining,
+    remainingMs: remaining,
+    finished: false,
+    finishedAt: null,
+  };
 }
 
 export function stop(timer: Timer, now: number): Timer {
@@ -80,11 +98,18 @@ export function stop(timer: Timer, now: number): Timer {
 }
 
 export function reset(timer: Timer): Timer {
-  return { ...timer, endAt: null, remainingMs: timer.durationMs, finished: false };
+  return {
+    ...timer,
+    endAt: null,
+    remainingMs: timer.durationMs,
+    finished: false,
+    finishedAt: null,
+  };
 }
 
-export function finish(timer: Timer): Timer {
-  return { ...timer, endAt: null, remainingMs: 0, finished: true };
+// Mark the timer as finished at the clock time `at`.
+export function finish(timer: Timer, at: number): Timer {
+  return { ...timer, endAt: null, remainingMs: 0, finished: true, finishedAt: at };
 }
 
 // True for a timer that has not started since its last reset.
@@ -92,11 +117,12 @@ export function isIdle(timer: Timer): boolean {
   return timer.endAt === null && !timer.finished && timer.remainingMs === timer.durationMs;
 }
 
-// Set the remaining time and keep the running or stopped state.
+// Set the remaining time and keep the running or stopped state. A timer that
+// is already finished keeps its finish time.
 function setRemaining(timer: Timer, leftMs: number, now: number): Timer {
-  if (leftMs <= 0) return finish(timer);
+  if (leftMs <= 0) return finish(timer, timer.finishedAt ?? now);
   const endAt = timer.endAt === null ? null : now + leftMs;
-  return { ...timer, endAt, remainingMs: leftMs, finished: false };
+  return { ...timer, endAt, remainingMs: leftMs, finished: false, finishedAt: null };
 }
 
 // Apply the values of the edit form. `leftMs` is a new remaining time, or null
