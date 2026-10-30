@@ -105,9 +105,23 @@ ul {
   gap: 12px;
 }
 
+.swipe-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.swipe-delete {
+  position: absolute;
+  inset: 0 0 0 auto;
+  background: var(--danger);
+  color: #fff;
+  font-weight: 600;
+}
+
 .timer {
   --color: var(--accent);
   position: relative;
+  touch-action: pan-y;
   overflow: hidden;
   display: flex;
   align-items: center;

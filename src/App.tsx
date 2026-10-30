@@ -19,6 +19,7 @@ import {
 import { playBeep, unlockSound } from './sound';
 import { useWakeLock } from './useWakeLock';
 import { type Theme, useTheme } from './theme';
+import { SwipeRow } from './SwipeRow';
 
 const THEME_ICONS: Record<Theme, string> = { auto: '◐', light: '☀\uFE0E', dark: '☾\uFE0E' };
 const THEME_LABELS: Record<Theme, string> = {
@@ -93,6 +94,8 @@ export default function App() {
   const update = (id: string, fn: (t: Timer) => Timer) =>
     setTimers((ts) => ts.map((t) => (t.id === id ? fn(t) : t)));
 
+  const remove = (id: string) => setTimers((ts) => ts.filter((t) => t.id !== id));
+
   const toggle = (timer: Timer) => {
     unlockSound();
     const t = Date.now();
@@ -132,10 +135,11 @@ export default function App() {
           const progress = timer.durationMs > 0 ? left / timer.durationMs : 0;
           const state = timer.finished ? 'finished' : running ? 'running' : 'stopped';
           return (
-            <li
+            <SwipeRow
               key={timer.id}
               className={`timer ${state}`}
               style={{ '--color': timer.color } as CSSProperties}
+              onDelete={() => remove(timer.id)}
             >
               <div className="bar" style={{ transform: `scaleX(${progress})` }} />
               <button className="info" onClick={() => setEditing(timer.id)}>
@@ -159,7 +163,7 @@ export default function App() {
                   {running ? <PauseIcon /> : <PlayIcon />}
                 </button>
               </div>
-            </li>
+            </SwipeRow>
           );
         })}
       </ul>
@@ -183,7 +187,7 @@ export default function App() {
           onDelete={
             editingTimer
               ? () => {
-                  setTimers((ts) => ts.filter((t) => t.id !== editingTimer.id));
+                  remove(editingTimer.id);
                   setEditing(null);
                 }
               : undefined
