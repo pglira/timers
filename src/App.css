@@ -26,6 +26,8 @@
 
 * {
   box-sizing: border-box;
+  /* Square corners on all elements, also on form controls that iOS rounds. */
+  border-radius: 0;
 }
 
 body {
@@ -75,7 +77,6 @@ h1 {
 .theme {
   width: 44px;
   height: 44px;
-  border-radius: 50%;
   background: var(--control);
   font-size: 20px;
   line-height: 1;
@@ -84,7 +85,6 @@ h1 {
 .add {
   width: 44px;
   height: 44px;
-  border-radius: 50%;
   background: var(--accent);
   color: #fff;
   font-size: 28px;
@@ -113,7 +113,6 @@ ul {
   align-items: center;
   gap: 8px;
   padding: 12px 12px 12px 16px;
-  border-radius: 16px;
   background: var(--card);
   border-left: 6px solid var(--color);
 }
@@ -172,7 +171,6 @@ ul {
 .actions button {
   width: 56px;
   height: 56px;
-  border-radius: 50%;
   font-size: 20px;
 }
 
@@ -203,7 +201,6 @@ ul {
   width: 100%;
   max-width: 600px;
   background: var(--card);
-  border-radius: 20px 20px 0 0;
   padding: 20px 16px calc(env(safe-area-inset-bottom) + 20px);
   display: grid;
   gap: 16px;
@@ -230,7 +227,6 @@ ul {
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
   padding: 10px 12px;
   width: 100%;
 }
@@ -243,7 +239,6 @@ ul {
 
 .swatch {
   aspect-ratio: 1;
-  border-radius: 50%;
 }
 
 .swatch[aria-checked='true'] {
@@ -274,7 +269,6 @@ ul {
 
 .buttons button {
   padding: 12px 18px;
-  border-radius: 10px;
   background: var(--control);
 }
 
