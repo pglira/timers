@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import {
   COLORS,
   type Timer,
@@ -20,32 +20,26 @@ import { playBeep, unlockSound } from './sound';
 import { useWakeLock } from './useWakeLock';
 import { type Theme, useTheme } from './theme';
 import { SwipeRow } from './SwipeRow';
+import {
+  AutoThemeIcon,
+  DarkThemeIcon,
+  LightThemeIcon,
+  PauseIcon,
+  PlayIcon,
+  PlusIcon,
+  ResetIcon,
+} from './icons';
 
-const THEME_ICONS: Record<Theme, string> = { auto: '◐', light: '☀\uFE0E', dark: '☾\uFE0E' };
+const THEME_ICONS: Record<Theme, ReactNode> = {
+  auto: <AutoThemeIcon />,
+  light: <LightThemeIcon />,
+  dark: <DarkThemeIcon />,
+};
 const THEME_LABELS: Record<Theme, string> = {
   auto: 'Theme: system',
   light: 'Theme: light',
   dark: 'Theme: dark',
 };
-
-// The icons are drawn in a 24×24 box with the shape at the center of the box.
-function PauseIcon() {
-  return (
-    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="6" y="5" width="4" height="14" />
-      <rect x="14" y="5" width="4" height="14" />
-    </svg>
-  );
-}
-
-// The triangle is shifted right so that its centroid is at the center of the box.
-function PlayIcon() {
-  return (
-    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M8 5 L20 12 L8 19 Z" />
-    </svg>
-  );
-}
 
 // A timer that got to zero more than this time ago finished while the app was
 // in the background, so it gets no sound.
@@ -119,7 +113,7 @@ export default function App() {
             {THEME_ICONS[theme]}
           </button>
           <button className="add" onClick={() => setEditing('new')} aria-label="Add timer">
-            +
+            <PlusIcon />
           </button>
         </div>
       </header>
@@ -153,7 +147,7 @@ export default function App() {
                   disabled={isIdle(timer)}
                   aria-label="Reset"
                 >
-                  ↺
+                  <ResetIcon />
                 </button>
                 <button
                   className="toggle"
