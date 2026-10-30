@@ -87,9 +87,36 @@ export function finish(timer: Timer): Timer {
   return { ...timer, endAt: null, remainingMs: 0, finished: true };
 }
 
-export function edit(timer: Timer, name: string, color: string, durationMs: number): Timer {
-  if (durationMs === timer.durationMs) return { ...timer, name, color };
-  return { ...reset({ ...timer, durationMs }), name, color };
+// True for a timer that has not started since its last reset.
+export function isIdle(timer: Timer): boolean {
+  return timer.endAt === null && !timer.finished && timer.remainingMs === timer.durationMs;
+}
+
+// Set the remaining time and keep the running or stopped state.
+function setRemaining(timer: Timer, leftMs: number, now: number): Timer {
+  if (leftMs <= 0) return finish(timer);
+  const endAt = timer.endAt === null ? null : now + leftMs;
+  return { ...timer, endAt, remainingMs: leftMs, finished: false };
+}
+
+// Apply the values of the edit form. `leftMs` is a new remaining time, or null
+// to keep the remaining time. An idle timer always gets its full duration. The
+// duration is never less than the remaining time.
+export function edit(
+  timer: Timer,
+  name: string,
+  color: string,
+  durationMs: number,
+  leftMs: number | null,
+  now: number,
+): Timer {
+  const base = { ...timer, name, color };
+  if (leftMs === null) {
+    if (durationMs === timer.durationMs) return base;
+    if (isIdle(timer)) return reset({ ...base, durationMs });
+    leftMs = Math.min(remainingMs(timer, now), durationMs);
+  }
+  return setRemaining({ ...base, durationMs: Math.max(durationMs, leftMs) }, leftMs, now);
 }
 
 export function splitDuration(ms: number): { h: number; m: number; s: number } {

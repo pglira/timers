@@ -6,6 +6,7 @@ import {
   edit,
   finish,
   formatDuration,
+  isIdle,
   loadTimers,
   nextColor,
   remainingMs,
@@ -126,7 +127,7 @@ export default function App() {
                 <button
                   className="reset"
                   onClick={() => update(timer.id, reset)}
-                  disabled={!running && !timer.finished && timer.remainingMs === timer.durationMs}
+                  disabled={isIdle(timer)}
                   aria-label="Reset"
                 >
                   ↺
@@ -150,9 +151,14 @@ export default function App() {
           timer={editingTimer}
           defaultColor={nextColor(timers)}
           onCancel={() => setEditing(null)}
-          onSave={(name, color, durationMs) => {
-            if (editingTimer) update(editingTimer.id, (t) => edit(t, name, color, durationMs));
-            else setTimers((ts) => [...ts, createTimer(name, color, durationMs)]);
+          onSave={(name, color, durationMs, leftMs) => {
+            if (editingTimer) {
+              const t = Date.now();
+              setNow(t);
+              update(editingTimer.id, (x) => edit(x, name, color, durationMs, leftMs, t));
+            } else {
+              setTimers((ts) => [...ts, createTimer(name, color, durationMs)]);
+            }
             setEditing(null);
           }}
           onDelete={
@@ -172,21 +178,22 @@ export default function App() {
 interface TimerFormProps {
   timer: Timer | undefined;
   defaultColor: string;
-  onSave: (name: string, color: string, durationMs: number) => void;
+  // `leftMs` is the new remaining time, or null when the user did not change it.
+  onSave: (name: string, color: string, durationMs: number, leftMs: number | null) => void;
   onCancel: () => void;
   onDelete?: () => void;
 }
 
 function TimerForm({ timer, defaultColor, onSave, onCancel, onDelete }: TimerFormProps) {
-  const initial = splitDuration(timer?.durationMs ?? 5 * 60 * 1000);
+  // The fields for the remaining time show only for a timer that has started.
+  const started = timer !== undefined && !isIdle(timer);
   const [name, setName] = useState(timer?.name ?? '');
   const [color, setColor] = useState(timer?.color ?? defaultColor);
-  const [h, setH] = useState(String(initial.h));
-  const [m, setM] = useState(String(initial.m));
-  const [s, setS] = useState(String(initial.s));
+  const duration = useDuration(timer?.durationMs ?? 5 * 60 * 1000);
+  const left = useDuration(timer ? remainingMs(timer, Date.now()) : 0);
 
-  const toInt = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
-  const durationMs = (toInt(h) * 3600 + toInt(m) * 60 + toInt(s)) * 1000;
+  const leftMs = started && left.changed ? left.ms : null;
+  const valid = duration.ms > 0 && (leftMs === null || leftMs > 0);
 
   return (
     <div className="backdrop" onClick={onCancel}>
@@ -195,7 +202,7 @@ function TimerForm({ timer, defaultColor, onSave, onCancel, onDelete }: TimerFor
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
-          if (durationMs > 0) onSave(name.trim() || 'Timer', color, durationMs);
+          if (valid) onSave(name.trim() || 'Timer', color, duration.ms, leftMs);
         }}
       >
         <h2>{timer ? 'Edit timer' : 'New timer'}</h2>
@@ -217,11 +224,8 @@ function TimerForm({ timer, defaultColor, onSave, onCancel, onDelete }: TimerFor
             />
           ))}
         </div>
-        <div className="duration">
-          <DurationField label="h" value={h} onChange={setH} />
-          <DurationField label="min" value={m} onChange={setM} />
-          <DurationField label="s" value={s} onChange={setS} />
-        </div>
+        {started && <DurationFields label="Time left" state={left} />}
+        <DurationFields label="Duration" state={duration} />
         <div className="buttons">
           {onDelete && (
             <button type="button" className="delete" onClick={onDelete}>
@@ -231,12 +235,45 @@ function TimerForm({ timer, defaultColor, onSave, onCancel, onDelete }: TimerFor
           <button type="button" onClick={onCancel}>
             Cancel
           </button>
-          <button type="submit" className="primary" disabled={durationMs <= 0}>
+          <button type="submit" className="primary" disabled={!valid}>
             Save
           </button>
         </div>
       </form>
     </div>
+  );
+}
+
+type DurationPart = 'h' | 'm' | 's';
+
+// State of three input fields for hours, minutes and seconds.
+function useDuration(initialMs: number) {
+  const initial = splitDuration(initialMs);
+  const [parts, setParts] = useState<Record<DurationPart, string>>({
+    h: String(initial.h),
+    m: String(initial.m),
+    s: String(initial.s),
+  });
+  const [changed, setChanged] = useState(false);
+
+  const toInt = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
+  const ms = (toInt(parts.h) * 3600 + toInt(parts.m) * 60 + toInt(parts.s)) * 1000;
+  const set = (part: DurationPart, value: string) => {
+    setParts((p) => ({ ...p, [part]: value }));
+    setChanged(true);
+  };
+  return { parts, set, ms, changed };
+}
+
+function DurationFields(props: { label: string; state: ReturnType<typeof useDuration> }) {
+  const { parts, set } = props.state;
+  return (
+    <fieldset className="duration">
+      <legend>{props.label}</legend>
+      <DurationField label="h" value={parts.h} onChange={(v) => set('h', v)} />
+      <DurationField label="min" value={parts.m} onChange={(v) => set('m', v)} />
+      <DurationField label="s" value={parts.s} onChange={(v) => set('s', v)} />
+    </fieldset>
   );
 }
 
