@@ -16,7 +16,8 @@ import {
   start,
   stop,
 } from './timers';
-import { playBeep, unlockSound } from './sound';
+import { unlockSound } from './sound';
+import { ALARM_MS, useAlarm } from './useAlarm';
 import { useWakeLock } from './useWakeLock';
 import { type Theme, useTheme } from './theme';
 import { SwipeRow } from './SwipeRow';
@@ -41,16 +42,14 @@ const THEME_LABELS: Record<Theme, string> = {
   dark: 'Theme: dark',
 };
 
-// A timer that got to zero more than this time ago finished while the app was
-// in the background, so it gets no sound.
-const SOUND_WINDOW_MS = 3000;
-
 export default function App() {
   const [timers, setTimers] = useState<Timer[]>(loadTimers);
   const [now, setNow] = useState(Date.now);
   // The id of the timer in the edit form, 'new' for a new timer, or null.
   const [editing, setEditing] = useState<string | null>(null);
   const [theme, nextTheme] = useTheme();
+  // The time at which each timer with an active alarm got to zero, by id.
+  const [alarms, setAlarms] = useState<Record<string, number>>({});
 
   const anyRunning = timers.some((t) => t.endAt !== null);
 
@@ -62,19 +61,24 @@ export default function App() {
     return () => clearInterval(id);
   }, [anyRunning]);
 
-  // Mark running timers as finished when they get to zero.
+  // Mark running timers as finished when they get to zero and start their
+  // alarms.
   useEffect(() => {
     const done = timers.filter((t) => t.endAt !== null && t.endAt <= now);
     if (done.length === 0) return;
-    if (
-      document.visibilityState === 'visible' &&
-      done.some((t) => now - (t.endAt as number) < SOUND_WINDOW_MS)
-    ) {
-      playBeep();
-    }
     const ids = new Set(done.map((t) => t.id));
     setTimers((ts) => ts.map((t) => (ids.has(t.id) ? finish(t) : t)));
+    const ends = Object.fromEntries(done.map((t) => [t.id, t.endAt as number]));
+    setAlarms((a) => ({ ...a, ...ends }));
   }, [timers, now]);
+
+  // An alarm stays active until the user stops it or changes its timer.
+  const ringing = timers.filter((t) => t.id in alarms);
+  // A timer that got to zero long ago, for example while the app was closed,
+  // shows its alarm without sound.
+  const loud = ringing.some((t) => Date.now() - alarms[t.id] < ALARM_MS);
+  useAlarm(loud);
+  const stopAlarms = () => setAlarms({});
 
   // Update the display at once when the app comes back to the foreground.
   useEffect(() => {
@@ -85,10 +89,18 @@ export default function App() {
 
   useWakeLock(anyRunning);
 
-  const update = (id: string, fn: (t: Timer) => Timer) =>
-    setTimers((ts) => ts.map((t) => (t.id === id ? fn(t) : t)));
+  const clearAlarm = (id: string) =>
+    setAlarms((a) => Object.fromEntries(Object.entries(a).filter(([k]) => k !== id)));
 
-  const remove = (id: string) => setTimers((ts) => ts.filter((t) => t.id !== id));
+  const update = (id: string, fn: (t: Timer) => Timer) => {
+    clearAlarm(id);
+    setTimers((ts) => ts.map((t) => (t.id === id ? fn(t) : t)));
+  };
+
+  const remove = (id: string) => {
+    clearAlarm(id);
+    setTimers((ts) => ts.filter((t) => t.id !== id));
+  };
 
   const toggle = (timer: Timer) => {
     unlockSound();
@@ -100,7 +112,7 @@ export default function App() {
   const editingTimer = timers.find((t) => t.id === editing);
 
   return (
-    <main>
+    <main className={ringing.length > 0 ? 'alarm-shown' : undefined}>
       <header>
         <h1>Timers</h1>
         <div className="header-buttons">
@@ -128,10 +140,11 @@ export default function App() {
           const left = remainingMs(timer, now);
           const progress = timer.durationMs > 0 ? left / timer.durationMs : 0;
           const state = timer.finished ? 'finished' : running ? 'running' : 'stopped';
+          const alarm = timer.id in alarms ? ' alarm' : '';
           return (
             <SwipeRow
               key={timer.id}
-              className={`timer ${state}`}
+              className={`timer ${state}${alarm}`}
               style={{ '--color': timer.color } as CSSProperties}
               onDelete={() => remove(timer.id)}
             >
@@ -161,6 +174,15 @@ export default function App() {
           );
         })}
       </ul>
+
+      {ringing.length > 0 && (
+        <div className="alarm-banner" role="alert">
+          <span className="alarm-names">
+            {ringing.map((t) => t.name).join(', ')} finished
+          </span>
+          <button onClick={stopAlarms}>Stop</button>
+        </div>
+      )}
 
       {editing !== null && (
         <TimerForm
