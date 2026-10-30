@@ -17,6 +17,14 @@ import {
 } from './timers';
 import { playBeep, unlockSound } from './sound';
 import { useWakeLock } from './useWakeLock';
+import { type Theme, useTheme } from './theme';
+
+const THEME_ICONS: Record<Theme, string> = { auto: '◐', light: '☀\uFE0E', dark: '☾\uFE0E' };
+const THEME_LABELS: Record<Theme, string> = {
+  auto: 'Theme: system',
+  light: 'Theme: light',
+  dark: 'Theme: dark',
+};
 
 // A timer that got to zero more than this time ago finished while the app was
 // in the background, so it gets no sound.
@@ -27,6 +35,7 @@ export default function App() {
   const [now, setNow] = useState(Date.now);
   // The id of the timer in the edit form, 'new' for a new timer, or null.
   const [editing, setEditing] = useState<string | null>(null);
+  const [theme, nextTheme] = useTheme();
 
   const anyRunning = timers.some((t) => t.endAt !== null);
 
@@ -77,9 +86,19 @@ export default function App() {
     <main>
       <header>
         <h1>Timers</h1>
-        <button className="add" onClick={() => setEditing('new')} aria-label="Add timer">
-          +
-        </button>
+        <div className="header-buttons">
+          <button
+            className="theme"
+            onClick={nextTheme}
+            aria-label={THEME_LABELS[theme]}
+            title={THEME_LABELS[theme]}
+          >
+            {THEME_ICONS[theme]}
+          </button>
+          <button className="add" onClick={() => setEditing('new')} aria-label="Add timer">
+            +
+          </button>
+        </div>
       </header>
 
       {timers.length === 0 && editing === null && (
