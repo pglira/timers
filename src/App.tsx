@@ -27,6 +27,25 @@ const THEME_LABELS: Record<Theme, string> = {
   dark: 'Theme: dark',
 };
 
+// The icons are drawn in a 24×24 box with the shape at the center of the box.
+function PauseIcon() {
+  return (
+    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="6" y="5" width="4" height="14" />
+      <rect x="14" y="5" width="4" height="14" />
+    </svg>
+  );
+}
+
+// The triangle is shifted right so that its centroid is at the center of the box.
+function PlayIcon() {
+  return (
+    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M8 5 L20 12 L8 19 Z" />
+    </svg>
+  );
+}
+
 // A timer that got to zero more than this time ago finished while the app was
 // in the background, so it gets no sound.
 const SOUND_WINDOW_MS = 3000;
@@ -137,7 +156,7 @@ export default function App() {
                   onClick={() => toggle(timer)}
                   aria-label={running ? 'Stop' : 'Start'}
                 >
-                  {running ? '❚❚' : '▶'}
+                  {running ? <PauseIcon /> : <PlayIcon />}
                 </button>
               </div>
             </li>
