@@ -1,6 +1,7 @@
 export interface Timer {
   id: string;
   name: string;
+  color: string;
   durationMs: number;
   // Remaining time of a stopped timer.
   remainingMs: number;
@@ -11,11 +12,32 @@ export interface Timer {
 
 const STORAGE_KEY = 'timers.v1';
 
+// Colors that the user can select for a timer.
+export const COLORS = [
+  '#43a047',
+  '#1e88e5',
+  '#8e24aa',
+  '#d81b60',
+  '#f4511e',
+  '#fb8c00',
+  '#00897b',
+  '#6d4c41',
+];
+
+// Return the first color that no timer uses, or cycle through COLORS when all
+// colors are in use.
+export function nextColor(timers: Timer[]): string {
+  const used = new Set(timers.map((t) => t.color));
+  return COLORS.find((c) => !used.has(c)) ?? COLORS[timers.length % COLORS.length];
+}
+
 export function loadTimers(): Timer[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? (parsed as Timer[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    // Timers stored without a color get the first color.
+    return (parsed as Timer[]).map((t) => ({ ...t, color: t.color ?? COLORS[0] }));
   } catch {
     return [];
   }
@@ -29,10 +51,11 @@ export function saveTimers(timers: Timer[]): void {
   }
 }
 
-export function createTimer(name: string, durationMs: number): Timer {
+export function createTimer(name: string, color: string, durationMs: number): Timer {
   return {
     id: crypto.randomUUID(),
     name,
+    color,
     durationMs,
     remainingMs: durationMs,
     endAt: null,
@@ -64,9 +87,9 @@ export function finish(timer: Timer): Timer {
   return { ...timer, endAt: null, remainingMs: 0, finished: true };
 }
 
-export function edit(timer: Timer, name: string, durationMs: number): Timer {
-  if (durationMs === timer.durationMs) return { ...timer, name };
-  return { ...timer, name, durationMs, remainingMs: durationMs, endAt: null, finished: false };
+export function edit(timer: Timer, name: string, color: string, durationMs: number): Timer {
+  if (durationMs === timer.durationMs) return { ...timer, name, color };
+  return { ...reset({ ...timer, durationMs }), name, color };
 }
 
 export function splitDuration(ms: number): { h: number; m: number; s: number } {

@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import {
+  COLORS,
   type Timer,
   createTimer,
   edit,
   finish,
   formatDuration,
   loadTimers,
+  nextColor,
   remainingMs,
   reset,
   saveTimers,
@@ -91,7 +93,11 @@ export default function App() {
           const progress = timer.durationMs > 0 ? left / timer.durationMs : 0;
           const state = timer.finished ? 'finished' : running ? 'running' : 'stopped';
           return (
-            <li key={timer.id} className={`timer ${state}`}>
+            <li
+              key={timer.id}
+              className={`timer ${state}`}
+              style={{ '--color': timer.color } as CSSProperties}
+            >
               <div className="bar" style={{ transform: `scaleX(${progress})` }} />
               <button className="info" onClick={() => setEditing(timer.id)}>
                 <span className="name">{timer.name}</span>
@@ -123,10 +129,11 @@ export default function App() {
         <TimerForm
           key={editing}
           timer={editingTimer}
+          defaultColor={nextColor(timers)}
           onCancel={() => setEditing(null)}
-          onSave={(name, durationMs) => {
-            if (editingTimer) update(editingTimer.id, (t) => edit(t, name, durationMs));
-            else setTimers((ts) => [...ts, createTimer(name, durationMs)]);
+          onSave={(name, color, durationMs) => {
+            if (editingTimer) update(editingTimer.id, (t) => edit(t, name, color, durationMs));
+            else setTimers((ts) => [...ts, createTimer(name, color, durationMs)]);
             setEditing(null);
           }}
           onDelete={
@@ -145,14 +152,16 @@ export default function App() {
 
 interface TimerFormProps {
   timer: Timer | undefined;
-  onSave: (name: string, durationMs: number) => void;
+  defaultColor: string;
+  onSave: (name: string, color: string, durationMs: number) => void;
   onCancel: () => void;
   onDelete?: () => void;
 }
 
-function TimerForm({ timer, onSave, onCancel, onDelete }: TimerFormProps) {
+function TimerForm({ timer, defaultColor, onSave, onCancel, onDelete }: TimerFormProps) {
   const initial = splitDuration(timer?.durationMs ?? 5 * 60 * 1000);
   const [name, setName] = useState(timer?.name ?? '');
+  const [color, setColor] = useState(timer?.color ?? defaultColor);
   const [h, setH] = useState(String(initial.h));
   const [m, setM] = useState(String(initial.m));
   const [s, setS] = useState(String(initial.s));
@@ -167,7 +176,7 @@ function TimerForm({ timer, onSave, onCancel, onDelete }: TimerFormProps) {
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
-          if (durationMs > 0) onSave(name.trim() || 'Timer', durationMs);
+          if (durationMs > 0) onSave(name.trim() || 'Timer', color, durationMs);
         }}
       >
         <h2>{timer ? 'Edit timer' : 'New timer'}</h2>
@@ -175,6 +184,20 @@ function TimerForm({ timer, onSave, onCancel, onDelete }: TimerFormProps) {
           Name
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Timer" />
         </label>
+        <div className="colors" role="radiogroup" aria-label="Color">
+          {COLORS.map((c, i) => (
+            <button
+              key={c}
+              type="button"
+              role="radio"
+              aria-checked={c === color}
+              aria-label={`Color ${i + 1}`}
+              className="swatch"
+              style={{ background: c }}
+              onClick={() => setColor(c)}
+            />
+          ))}
+        </div>
         <div className="duration">
           <DurationField label="h" value={h} onChange={setH} />
           <DurationField label="min" value={m} onChange={setM} />
