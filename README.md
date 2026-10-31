@@ -2,6 +2,8 @@
 
 A Progressive Web App with multiple countdown timers. Each timer starts, stops and resets separately.
 
+To change the order of the timers, tap the order button in the header and drag the handle of a timer up or down.
+
 - React, TypeScript and Vite
 - `vite-plugin-pwa` for the manifest, the service worker and the offline cache
 - `localStorage` for the data

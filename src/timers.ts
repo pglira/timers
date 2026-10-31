@@ -70,6 +70,14 @@ export function createTimer(name: string, color: string, durationMs: number): Ti
   };
 }
 
+// Move the timer at index `from` to index `to`.
+export function moveTimer(timers: Timer[], from: number, to: number): Timer[] {
+  const result = [...timers];
+  const [timer] = result.splice(from, 1);
+  result.splice(to, 0, timer);
+  return result;
+}
+
 export function remainingMs(timer: Timer, now: number): number {
   return timer.endAt === null ? timer.remainingMs : Math.max(0, timer.endAt - now);
 }

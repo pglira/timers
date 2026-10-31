@@ -77,3 +77,29 @@ export function DarkThemeIcon() {
     </Icon>
   );
 }
+
+// Two vertical arrows that point in opposite directions.
+export function SortIcon() {
+  return (
+    <Icon>
+      <path className="line" d="M8 4V20M4 16L8 20L12 16M16 20V4M12 8L16 4L20 8" />
+    </Icon>
+  );
+}
+
+export function CheckIcon() {
+  return (
+    <Icon>
+      <path className="line" d="M5 12L10 17L19 7" />
+    </Icon>
+  );
+}
+
+// Three horizontal lines: the handle that moves a row.
+export function GripIcon() {
+  return (
+    <Icon>
+      <path className="line" d="M4 8H20M4 12H20M4 16H20" />
+    </Icon>
+  );
+}

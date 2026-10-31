@@ -92,6 +92,11 @@ h1 {
   color: #fff;
 }
 
+.theme.active {
+  background: var(--accent);
+  color: #fff;
+}
+
 .empty {
   color: var(--muted);
   text-align: center;
@@ -176,6 +181,28 @@ ul {
 
 .timer.finished .time {
   color: var(--finished);
+}
+
+.handle {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--muted);
+  /* The handle gets all pointer moves, so that a drag does not scroll the page. */
+  touch-action: none;
+  cursor: grab;
+}
+
+.timer.dragged {
+  z-index: 1;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.35);
+}
+
+.timer.dragged .handle {
+  cursor: grabbing;
 }
 
 .actions {

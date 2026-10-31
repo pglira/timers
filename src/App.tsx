@@ -1,4 +1,12 @@
-import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   COLORS,
   type Timer,
@@ -8,6 +16,7 @@ import {
   formatDuration,
   isIdle,
   loadTimers,
+  moveTimer,
   nextColor,
   overtimeMs,
   remainingMs,
@@ -24,12 +33,15 @@ import { type Theme, useTheme } from './theme';
 import { SwipeRow } from './SwipeRow';
 import {
   AutoThemeIcon,
+  CheckIcon,
   DarkThemeIcon,
+  GripIcon,
   LightThemeIcon,
   PauseIcon,
   PlayIcon,
   PlusIcon,
   ResetIcon,
+  SortIcon,
 } from './icons';
 
 const THEME_ICONS: Record<Theme, ReactNode> = {
@@ -49,6 +61,8 @@ export default function App() {
   // The id of the timer in the edit form, 'new' for a new timer, or null.
   const [editing, setEditing] = useState<string | null>(null);
   const [theme, nextTheme] = useTheme();
+  // True while the list shows drag handles to change the order of the timers.
+  const [reorder, setReorder] = useState(false);
   // The ids of the timers with an active alarm.
   const [alarms, setAlarms] = useState<ReadonlySet<string>>(new Set());
 
@@ -119,6 +133,17 @@ export default function App() {
       <header>
         <h1>Timers</h1>
         <div className="header-buttons">
+          {timers.length > 1 && (
+            <button
+              className={reorder ? 'theme active' : 'theme'}
+              onClick={() => setReorder((r) => !r)}
+              aria-pressed={reorder}
+              aria-label="Change order"
+              title="Change order"
+            >
+              {reorder ? <CheckIcon /> : <SortIcon />}
+            </button>
+          )}
           <button
             className="theme"
             onClick={nextTheme}
@@ -137,49 +162,57 @@ export default function App() {
         <p className="empty">No timers. Tap + to add a timer.</p>
       )}
 
-      <ul>
-        {timers.map((timer) => {
-          const running = timer.endAt !== null;
-          const left = remainingMs(timer, now);
-          const over = overtimeMs(timer, now);
-          const progress = timer.durationMs > 0 ? left / timer.durationMs : 0;
-          const state = timer.finished ? 'finished' : running ? 'running' : 'stopped';
-          const alarm = alarms.has(timer.id) ? ' alarm' : '';
-          return (
-            <SwipeRow
-              key={timer.id}
-              className={`timer ${state}${alarm}`}
-              style={{ '--color': timer.color } as CSSProperties}
-              onDelete={() => remove(timer.id)}
-            >
-              <div className="bar" style={{ transform: `scaleX(${progress})` }} />
-              <button className="info" onClick={() => setEditing(timer.id)}>
-                <span className="name">{timer.name}</span>
-                <span className="time">
-                  {over > 0 ? `-${formatDuration(over)}` : formatDuration(left)}
-                </span>
-              </button>
-              <div className="actions">
-                <button
-                  className="reset"
-                  onClick={() => update(timer.id, reset)}
-                  disabled={isIdle(timer)}
-                  aria-label="Reset"
-                >
-                  <ResetIcon />
+      {reorder && timers.length > 1 ? (
+        <ReorderList
+          timers={timers}
+          now={now}
+          onMove={(from, to) => setTimers((ts) => moveTimer(ts, from, to))}
+        />
+      ) : (
+        <ul>
+          {timers.map((timer) => {
+            const running = timer.endAt !== null;
+            const left = remainingMs(timer, now);
+            const over = overtimeMs(timer, now);
+            const progress = timer.durationMs > 0 ? left / timer.durationMs : 0;
+            const state = timer.finished ? 'finished' : running ? 'running' : 'stopped';
+            const alarm = alarms.has(timer.id) ? ' alarm' : '';
+            return (
+              <SwipeRow
+                key={timer.id}
+                className={`timer ${state}${alarm}`}
+                style={{ '--color': timer.color } as CSSProperties}
+                onDelete={() => remove(timer.id)}
+              >
+                <div className="bar" style={{ transform: `scaleX(${progress})` }} />
+                <button className="info" onClick={() => setEditing(timer.id)}>
+                  <span className="name">{timer.name}</span>
+                  <span className="time">
+                    {over > 0 ? `-${formatDuration(over)}` : formatDuration(left)}
+                  </span>
                 </button>
-                <button
-                  className="toggle"
-                  onClick={() => toggle(timer)}
-                  aria-label={running ? 'Stop' : 'Start'}
-                >
-                  {running ? <PauseIcon /> : <PlayIcon />}
-                </button>
-              </div>
-            </SwipeRow>
-          );
-        })}
-      </ul>
+                <div className="actions">
+                  <button
+                    className="reset"
+                    onClick={() => update(timer.id, reset)}
+                    disabled={isIdle(timer)}
+                    aria-label="Reset"
+                  >
+                    <ResetIcon />
+                  </button>
+                  <button
+                    className="toggle"
+                    onClick={() => toggle(timer)}
+                    aria-label={running ? 'Stop' : 'Start'}
+                  >
+                    {running ? <PauseIcon /> : <PlayIcon />}
+                  </button>
+                </div>
+              </SwipeRow>
+            );
+          })}
+        </ul>
+      )}
 
       {ringing.length > 0 && (
         <div className="alarm-banner" role="alert">
@@ -217,6 +250,92 @@ export default function App() {
         />
       )}
     </main>
+  );
+}
+
+interface ReorderListProps {
+  timers: Timer[];
+  now: number;
+  onMove: (from: number, to: number) => void;
+}
+
+// The timers with a drag handle on each row. Drag a handle up or down to move
+// the timer. The arrow keys move the timer of the focused handle.
+function ReorderList({ timers, now, onMove }: ReorderListProps) {
+  // The dragged timer, the pointer position at which its row is at rest, and
+  // the current pointer position.
+  const [drag, setDrag] = useState<{ id: string; origin: number; y: number } | null>(null);
+  const rows = useRef<HTMLUListElement>(null);
+
+  // The distance between the tops of two rows in pixels.
+  const step = () => {
+    const ul = rows.current;
+    const li = ul?.firstElementChild as HTMLElement | null;
+    if (!ul || !li) return 1;
+    return li.offsetHeight + parseFloat(getComputedStyle(ul).rowGap || '0');
+  };
+
+  const onPointerMove = (e: PointerEvent) => {
+    if (!drag) return;
+    const index = timers.findIndex((t) => t.id === drag.id);
+    const s = step();
+    let origin = drag.origin;
+    let to = index;
+    while (e.clientY - origin > s / 2 && to < timers.length - 1) {
+      origin += s;
+      to++;
+    }
+    while (e.clientY - origin < -s / 2 && to > 0) {
+      origin -= s;
+      to--;
+    }
+    if (to !== index) onMove(index, to);
+    setDrag({ id: drag.id, origin, y: e.clientY });
+  };
+
+  const onKeyDown = (e: KeyboardEvent, index: number) => {
+    const to = e.key === 'ArrowUp' ? index - 1 : e.key === 'ArrowDown' ? index + 1 : -1;
+    if (to < 0 || to >= timers.length) return;
+    e.preventDefault();
+    onMove(index, to);
+  };
+
+  return (
+    <ul ref={rows}>
+      {timers.map((timer, index) => {
+        const dragged = drag?.id === timer.id;
+        const over = overtimeMs(timer, now);
+        const style = {
+          '--color': timer.color,
+          transform: dragged ? `translateY(${drag.y - drag.origin}px)` : undefined,
+        } as CSSProperties;
+        return (
+          <li key={timer.id} className={`timer${dragged ? ' dragged' : ''}`} style={style}>
+            <span className="info">
+              <span className="name">{timer.name}</span>
+              <span className="time">
+                {over > 0 ? `-${formatDuration(over)}` : formatDuration(remainingMs(timer, now))}
+              </span>
+            </span>
+            <button
+              className="handle"
+              aria-label={`Move ${timer.name}`}
+              title="Drag to move"
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setDrag({ id: timer.id, origin: e.clientY, y: e.clientY });
+              }}
+              onPointerMove={onPointerMove}
+              onPointerUp={() => setDrag(null)}
+              onPointerCancel={() => setDrag(null)}
+              onKeyDown={(e) => onKeyDown(e, index)}
+            >
+              <GripIcon />
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
