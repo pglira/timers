@@ -7,6 +7,7 @@ To change the order of the timers, tap the order button in the header and drag t
 - React, TypeScript and Vite
 - `vite-plugin-pwa` for the manifest, the service worker and the offline cache
 - `localStorage` for the data
+- Back up all data: the backup button exports the data to a JSON file. Import the file on a new phone to replace all data there. The theme is not part of the backup.
 
 ## Development
 

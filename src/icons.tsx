@@ -103,3 +103,12 @@ export function GripIcon() {
     </Icon>
   );
 }
+
+// An arrow that points down into a tray: the backup of the data.
+export function BackupIcon() {
+  return (
+    <Icon>
+      <path className="line" d="M12 4V14M8 10L12 14L16 10M4 16V20H20V16" />
+    </Icon>
+  );
+}

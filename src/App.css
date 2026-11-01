@@ -399,3 +399,39 @@ ul {
 main.alarm-shown {
   padding-bottom: calc(env(safe-area-inset-bottom) + 120px);
 }
+
+.backup-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.backup-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.backup-buttons button,
+.sheet label.backup-file,
+.backup-replace {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 18px;
+  font-size: inherit;
+  color: var(--text);
+  background: var(--control);
+  cursor: pointer;
+}
+
+.backup-replace {
+  color: #fff;
+  background: var(--danger);
+}
+
+.backup-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 14px;
+}

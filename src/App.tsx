@@ -14,6 +14,7 @@ import {
   edit,
   finish,
   formatDuration,
+  isDataKey,
   isIdle,
   loadTimers,
   moveTimer,
@@ -26,6 +27,7 @@ import {
   start,
   stop,
 } from './timers';
+import { BackupSheet } from './BackupSheet';
 import { unlockSound } from './sound';
 import { ALARM_MS, useAlarm } from './useAlarm';
 import { useWakeLock } from './useWakeLock';
@@ -33,6 +35,7 @@ import { type Theme, useTheme } from './theme';
 import { SwipeRow } from './SwipeRow';
 import {
   AutoThemeIcon,
+  BackupIcon,
   CheckIcon,
   DarkThemeIcon,
   GripIcon,
@@ -60,6 +63,8 @@ export default function App() {
   const [now, setNow] = useState(Date.now);
   // The id of the timer in the edit form, 'new' for a new timer, or null.
   const [editing, setEditing] = useState<string | null>(null);
+  // True while the backup sheet is open.
+  const [backup, setBackup] = useState(false);
   const [theme, nextTheme] = useTheme();
   // True while the list shows drag handles to change the order of the timers.
   const [reorder, setReorder] = useState(false);
@@ -152,6 +157,9 @@ export default function App() {
           >
             {THEME_ICONS[theme]}
           </button>
+          <button className="theme" onClick={() => setBackup(true)} aria-label="Backup" title="Backup">
+            <BackupIcon />
+          </button>
           <button className="add" onClick={() => setEditing('new')} aria-label="Add timer">
             <PlusIcon />
           </button>
@@ -222,6 +230,8 @@ export default function App() {
           <button onClick={stopAlarms}>Stop</button>
         </div>
       )}
+
+      {backup && <BackupSheet app="timers" isKey={isDataKey} onClose={() => setBackup(false)} />}
 
       {editing !== null && (
         <TimerForm
